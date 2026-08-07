@@ -1,0 +1,25 @@
+# Core stack -- required, always installed.
+# Version floors chosen for Python 3.14 compatibility (pydantic-core only
+# ships pre-built wheels for 3.14 starting at pydantic 2.12+).
+fastapi>=0.115.0
+uvicorn>=0.32.0
+pydantic>=2.12.0
+python-multipart>=0.0.9
+sqlalchemy>=2.0.30
+
+# ---- Optional upgrades below ----
+# Each module works without these (falls back to rule-based logic).
+# Uncomment the ones you want, then `uv pip install -r requirements.txt`.
+
+# Real pose detection for /workout/analyze-image (Module 1)
+# mediapipe>=0.10.14
+# opencv-python-headless>=4.10.0
+
+# Real LLM-powered chat for the Virtual Gym Buddy (Module 5)
+# openai>=1.40.0
+
+# Real MQTT/IoT listener for the Smart Gym Assistant (Module 3)
+# paho-mqtt>=2.1.0
+
+# Real gym search via Google Places for the Gym Recommender (Module 7)
+# requests>=2.32.0
