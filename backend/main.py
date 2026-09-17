@@ -6,15 +6,11 @@ Run locally with:
 
 Then open http://127.0.0.1:8000/docs for the interactive Swagger UI where
 you can test every module's endpoints directly.
-
-On startup this also:
-- creates the SQLite database (fitness.db) and all tables if missing
-- starts the optional MQTT listener for the Smart Gym module, if
-  paho-mqtt is installed and MQTT_BROKER_HOST is configured
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
 import os
 
 from database import init_db
@@ -29,23 +25,35 @@ from modules import (
     analytics,
 )
 
+# Define lifespan FIRST
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    init_db()
+    smart_gym.start_mqtt_listener()
+    yield
+    # Shutdown
+
+# Create app ONCE with lifespan
 app = FastAPI(
     title="AI Gym & Fitness Assistant API",
     description="Unified backend for workout detection, diet planning, IoT smart gym, "
                 "habit tracking, chat companion, performance scoring, gym recommendations, "
                 "and analytics.",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
+# Add CORS — include port 5173 for your frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten this to your deployed frontend URL in production
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Serve uploaded workout images (stand-in for AWS S3 / Firebase storage)
+# Serve uploaded workout images
 UPLOAD_ROOT = os.path.join(os.path.dirname(__file__), "uploads")
 os.makedirs(UPLOAD_ROOT, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOAD_ROOT), name="uploads")
@@ -59,25 +67,6 @@ app.include_router(chat_companion.router)
 app.include_router(performance_analyzer.router)
 app.include_router(gym_recommender.router)
 app.include_router(analytics.router)
-
-
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    smart_gym.start_mqtt_listener()
-    yield
-    # Shutdown (optional cleanup here)
-
-app = FastAPI(
-    title="AI Gym & Fitness Assistant API",
-    description="Unified backend for workout detection, diet planning, behavior "
-                "tracking, IoT gym assistance, and conversational AI.",
-    version="0.1.0",
-    lifespan=lifespan,
-)
-
 
 @app.get("/")
 def root():
