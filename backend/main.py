@@ -61,10 +61,22 @@ app.include_router(gym_recommender.router)
 app.include_router(analytics.router)
 
 
-@app.on_event("startup")
-def on_startup():
-    init_db()
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
     smart_gym.start_mqtt_listener()
+    yield
+    # Shutdown (optional cleanup here)
+
+app = FastAPI(
+    title="AI Gym & Fitness Assistant API",
+    description="Unified backend for workout detection, diet planning, behavior "
+                "tracking, IoT gym assistance, and conversational AI.",
+    version="0.1.0",
+    lifespan=lifespan,
+)
 
 
 @app.get("/")
