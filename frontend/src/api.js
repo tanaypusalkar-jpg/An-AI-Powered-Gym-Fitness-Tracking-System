@@ -1,6 +1,6 @@
 // Central place for the backend base URL. Change this if you deploy the
 // backend somewhere other than localhost.
-export const API_BASE = "http://127.0.0.1:8000";
+export const API_BASE = "http://localhost:8000";
 
 export async function postJSON(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
