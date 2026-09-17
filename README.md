@@ -160,3 +160,46 @@ Then check `GET /smartgym/mqtt-status` to see the latest reading received.
 | Places search (optional) | Google Places API |
 | Package managers | uv (Python), npm (JS) |
 | Dev orchestration | concurrently (root `npm run dev`) |
+
+
+============================================================
+  Habit Tracker — Skip Risk Classification
+============================================================
+Test cases: 20
+Accuracy:   1.000
+
+Class         Precision   Recall    F1      Support
+low_risk      1.0         1.0       1.0     7
+medium_risk   1.0         1.0       1.0     7
+high_risk     1.0         1.0       1.0     6
+macro avg     1.0         1.0       1.0     20
+
+Confusion matrix (rows = true label, columns = predicted label):
+              low_risk      medium_risk   high_risk     
+low_risk      7             0             0             
+medium_risk   0             7             0             
+high_risk     0             0             6             
+
+============================================================
+  Chat Companion — Sentiment Classification
+============================================================
+Test cases: 20
+Accuracy:   0.750
+
+Class         Precision   Recall    F1      Support
+positive      0.833       0.556     0.667   9
+neutral       1.0         0.8       0.889   5
+negative      0.6         1.0       0.75    6
+macro avg     0.811       0.785     0.769   20
+
+Confusion matrix (rows = true label, columns = predicted label):
+              positive      neutral       negative      
+positive      5             0             4             
+neutral       1             4             0             
+negative      0             0             6             
+
+============================================================
+  SUMMARY
+============================================================
+Habit Tracker accuracy: 100.0%  |  macro F1: 1.000
+Chat Sentiment accuracy: 75.0%  |  macro F1: 0.769

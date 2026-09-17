@@ -10,6 +10,12 @@
     "install:all": "cd backend && uv venv && uv pip install -r requirements.txt && cd ../frontend && npm install"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@vitejs/plugin-react": "^6.0.5",
+    "concurrently": "^8.2.2",
+    "vite": "^8.2.1"
+  },
+  "dependencies": {
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
   }
 }
