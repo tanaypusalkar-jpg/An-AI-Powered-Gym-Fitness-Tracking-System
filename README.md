@@ -14,7 +14,7 @@ environment variable — no code changes needed.
 
 ## Project Structure
 
-```
+```text
 ai-gym-fitness-assistant/
 ├── package.json                 # root runner (npm run dev -> both servers)
 ├── backend/
