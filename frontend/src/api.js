@@ -1,6 +1,6 @@
 // Central place for the backend base URL. Change this if you deploy the
 // backend somewhere other than localhost.
-export const API_BASE = "http://127.0.0.1:5173"; // Vite proxies this to the backend
+export const API_BASE = "http://127.0.0.1:8000";  // ← should be 8000, not 5173
 
 export async function postJSON(path, body) {
   const res = await fetch(`${API_BASE}${path}`, {
