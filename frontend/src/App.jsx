@@ -7,8 +7,26 @@ import ChatCompanion from "./components/ChatCompanion.jsx";
 import PerformanceAnalyzer from "./components/PerformanceAnalyzer.jsx";
 import GymRecommender from "./components/GymRecommender.jsx";
 import AnalyticsDashboard from "./components/AnalyticsDashboard.jsx";
+import HomeDashboard from "./pages/HomeDashboard";
+import ProgressDetails from "./pages/ProgressDetails";
+
+// Map each HomeDashboard module key to the existing tab key it should open.
+const MODULE_KEY_TO_TAB = {
+  workout_trainer: "trainer",
+  diet_coach: "diet",
+  smart_gym: "smartgym",
+  habit_tracker: "habits",
+  chat_companion: "chat",
+  performance_analyzer: "performance",
+  gym_recommender: "recommend",
+};
 
 const TABS = [
+  {
+    key: "home",
+    label: "Home",
+    component: null, // rendered specially below, so it can receive nav props
+  },
   { key: "trainer", label: "Gym Trainer", component: WorkoutTrainer },
   { key: "diet", label: "Diet Coach", component: DietCoach },
   { key: "smartgym", label: "Smart Gym", component: SmartGym },
@@ -17,11 +35,31 @@ const TABS = [
   { key: "performance", label: "Performance Score", component: PerformanceAnalyzer },
   { key: "recommend", label: "Gym Recommender", component: GymRecommender },
   { key: "analytics", label: "Analytics", component: AnalyticsDashboard },
+  {
+    key: "progress",
+    label: "Progress",
+    component: null, // rendered specially below, same reason as "home"
+  },
 ];
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState("trainer");
-  const ActiveComponent = TABS.find((t) => t.key === activeTab).component;
+  const [activeTab, setActiveTab] = useState("home");
+
+  const renderActiveTab = () => {
+    if (activeTab === "home") {
+      return (
+        <HomeDashboard
+          onOpenModule={(key) => setActiveTab(MODULE_KEY_TO_TAB[key] ?? "trainer")}
+          onOpenProgress={() => setActiveTab("progress")}
+        />
+      );
+    }
+    if (activeTab === "progress") {
+      return <ProgressDetails onBack={() => setActiveTab("home")} />;
+    }
+    const ActiveComponent = TABS.find((t) => t.key === activeTab).component;
+    return <ActiveComponent />;
+  };
 
   return (
     <div className="app">
@@ -42,7 +80,7 @@ export default function App() {
         ))}
       </nav>
 
-      <ActiveComponent />
+      {renderActiveTab()}
     </div>
   );
 }
