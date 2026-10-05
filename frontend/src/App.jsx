@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
-import GymTrainer from './pages/modules/GymTrainer';
-import DietCoach from './pages/modules/DietCoach';
-import SmartGym from './pages/modules/SmartGym';
-import HabitTracker from './pages/modules/HabitTracker';
-import ChatCompanion from './pages/modules/ChatCompanion';
-import PerformanceScore from './pages/modules/PerformanceScore';
-import GymRecommender from './pages/modules/GymRecommender';
-import Analytics from './pages/modules/Analytics';
+import GymTrainer from './components/GymTrainer';
+import DietCoach from './components/DietCoach';
+import SmartGym from './components/SmartGym';
+import HabitTracker from './components/HabitTracker';
+import ChatCompanion from './components/ChatCompanion';
+import PerformanceScore from './components/PerformanceScore';
+import GymRecommender from './components/GymRecommender';
+import Analytics from './components/Analytics';
 import './styles/globals.css';
 
 export default function App() {
