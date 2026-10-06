@@ -9,7 +9,7 @@ import ChatCompanion from './components/ChatCompanion';
 import PerformanceScore from './components/PerformanceScore';
 import GymRecommender from './components/GymRecommender';
 import Analytics from './components/Analytics';
-import './styles/globals.css';
+import './styles.css/';
 
 export default function App() {
   const [activeModule, setActiveModule] = useState('home');
