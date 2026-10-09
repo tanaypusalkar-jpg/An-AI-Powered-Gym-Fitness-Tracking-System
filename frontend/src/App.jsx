@@ -46,5 +46,5 @@ export default function App() {
   const [activeModule,setActiveModule]=useState("home");
   const [sidebarOpen,setSidebarOpen]=useState(true);
   const content={"gym-trainer":<GymTrainer/>,"diet-coach":<DietCoach/>,"smart-gym":<SmartGym/>,"habit-tracker":<HabitTracker/>,"chat-companion":<ChatCompanion/>,performance:<PerformanceScore/>,recommender:<GymRecommender/>,analytics:<Analytics/>}[activeModule];
-  return <div className="app-shell"><Sidebar isOpen={sidebarOpen} modules={modules} activeModule={activeModule} onSelectModule={setActiveModule}/><div className="app-main"><Header onToggleSidebar={()=>setSidebarOpen(!sidebarOpen)} activeModuleName={activeModule==="home"?"Dashboard":modules.find(m=>m.id===activeModule)?.name||"Module"}/><main className="content-area">{content||<Home onSelectModule={setActiveModule}/>}</main></div></div>;
+  return <div className="app-shell"><Sidebar isOpen={sidebarOpen} modules={modules} activeModule={activeModule} onSelectModule={setActiveModule}/><div className="app-main"><Header onToggleSidebar={()=>setSidebarOpen(!sidebarOpen)} activeModuleName={activeModule==="home"?"Dashboard":modules.find(m=>m.id===activeModule)?.name||"Module"}/><main className="content-area">{content ? <div className="module-view">{content}</div> : <Home onSelectModule={setActiveModule}/>}</main></div></div>;
 }
