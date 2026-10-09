@@ -1,5 +1,4 @@
-const API_BASE =
-  import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 /**
  * Generic POST helper used by the existing components.
@@ -33,7 +32,6 @@ export async function postJSON(path, payload) {
   return data;
 }
 
-
 /**
  * Generic GET helper.
  */
@@ -60,7 +58,6 @@ export async function getJSON(path) {
   return data;
 }
 
-
 /**
  * Workout analysis.
  */
@@ -68,14 +65,13 @@ export function analyzeWorkout(payload) {
   return postJSON("/workout/analyze", payload);
 }
 
-
 /**
  * Performance analysis.
+ * The FastAPI router exposes this endpoint at /performance/score.
  */
 export function calculatePerformance(payload) {
-  return postJSON("/performance/analyze", payload);
+  return postJSON("/performance/score", payload);
 }
-
 
 /**
  * Analytics.
@@ -84,8 +80,8 @@ export function getAnalytics() {
   return getJSON("/analytics/summary");
 }
 
-
 /**
  * Export API base URL if another component needs it.
+ * Set VITE_API_BASE when the API is hosted on a different origin.
  */
 export { API_BASE };
