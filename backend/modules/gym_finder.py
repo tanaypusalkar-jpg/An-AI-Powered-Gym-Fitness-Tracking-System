@@ -1,8 +1,17 @@
 """Location-based gym finder backed by OpenStreetMap / Overpass.
 
 Listings are live community-mapped data, not a complete or verified directory.
+
+Changes from the previous version:
+- Successful search results are cached in memory for one hour, so repeat
+  searches for the same city never call Nominatim or Overpass again.
+- Overpass endpoints get a longer per-request timeout (35 s) because the public
+  servers are often slow under load, which caused the 503 errors.
+- Failures are not cached, so the next search retries the network.
 """
 import json
+import logging
+import time
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -11,6 +20,23 @@ from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(prefix="/gym-finder", tags=["Location-based Gym Finder"])
 USER_AGENT = "AIGymFitnessAssistant/1.0 (Maharashtra gym finder)"
+logger = logging.getLogger(__name__)
+
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+]
+OVERPASS_SERVER_TIMEOUT = 25      # [timeout:...] inside the Overpass query
+OVERPASS_CLIENT_TIMEOUT = 35      # how long we wait for each endpoint over the network
+GEOCODE_TIMEOUT = 15
+RESULT_CACHE_TTL = 60 * 60        # seconds
+
+NOTICE = "Community-mapped listings may be incomplete or out of date. Confirm details with the gym before visiting."
+NETWORK_ERRORS = (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError)
+
+# place (casefolded) -> (timestamp, full search result before the limit is applied)
+_result_cache: dict = {}
 
 
 def _get_json(url: str, timeout: int = 25):
@@ -19,16 +45,7 @@ def _get_json(url: str, timeout: int = 25):
         return json.loads(response.read().decode("utf-8"))
 
 
-@router.get("/search")
-def search_gyms(
-    city: str = Query(..., min_length=2, max_length=100, description="City or district in Maharashtra"),
-    limit: int = Query(50, ge=1, le=100),
-):
-    """Find mapped gyms in a Maharashtra city/district, with map links."""
-    place = city.strip()
-    if not place:
-        raise HTTPException(status_code=422, detail="Enter a city or district.")
-
+def _geocode(place: str) -> dict:
     # Restrict geocoding to Maharashtra, India so same-named places elsewhere
     # are less likely to be selected.
     geocode_url = "https://nominatim.openstreetmap.org/search?" + urlencode({
@@ -39,72 +56,55 @@ def search_gyms(
         "addressdetails": 1,
     })
     try:
-        locations = _get_json(geocode_url, timeout=15)
-        if not locations:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Couldn't locate '{place}' in Maharashtra. Try a city or district name.",
-            )
+        locations = _get_json(geocode_url, timeout=GEOCODE_TIMEOUT)
+    except NETWORK_ERRORS as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="The open map service is temporarily unavailable. Please try again shortly.",
+        ) from exc
+    if not locations:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Couldn't locate '{place}' in Maharashtra. Try a city or district name.",
+        )
+    return locations[0]
 
-        location = locations[0]
-        # Use a compact radius around the geocoded city center rather than
-        # the entire city bounding box; large bbox queries often time out.
-        latitude = float(location["lat"])
-        longitude = float(location["lon"])
-        radius_m = 8000
-        query = f"""[out:json][timeout:18];
+
+def _query_overpass(latitude: float, longitude: float, radius_m: int = 8000) -> dict:
+    query = f"""[out:json][timeout:{OVERPASS_SERVER_TIMEOUT}];
 (
   nwr["leisure"="fitness_centre"](around:{radius_m},{latitude},{longitude});
   nwr["amenity"="gym"](around:{radius_m},{latitude},{longitude});
 );
 out center tags;"""
-        # Public Overpass instances can rate-limit or time out. Try more than
-        # one endpoint before returning an error to the user.
-        encoded_query = urlencode({"data": query}).encode("utf-8")
-        overpass_endpoints = [
-            "https://overpass-api.de/api/interpreter",
-            "https://overpass.kumi.systems/api/interpreter",
-            "https://overpass.private.coffee/api/interpreter",
-        ]
-        last_error = None
-        payload = None
-        for overpass_url in overpass_endpoints:
-            request = Request(
-                overpass_url,
-                data=encoded_query,
-                headers={
-                    "User-Agent": USER_AGENT,
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    "Accept": "application/json",
-                },
-                method="POST",
-            )
-            try:
-                with urlopen(request, timeout=22) as response:
-                    payload = json.loads(response.read().decode("utf-8"))
-                break
-            except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
-                last_error = exc
+    encoded_query = urlencode({"data": query}).encode("utf-8")
+    last_error = None
+    for overpass_url in OVERPASS_ENDPOINTS:
+        request = Request(
+            overpass_url,
+            data=encoded_query,
+            headers={
+                "User-Agent": USER_AGENT,
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=OVERPASS_CLIENT_TIMEOUT) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except NETWORK_ERRORS as exc:
+            last_error = exc
+            logger.info("Overpass endpoint %s failed: %s", overpass_url, exc)
 
-        if payload is None:
-            # Keep provider details in the server log while returning a safe,
-            # actionable message to the frontend.
-            import logging
-            logging.getLogger(__name__).warning(
-                "All Overpass endpoints failed for city=%r: %s", place, last_error
-            )
-            raise HTTPException(
-                status_code=503,
-                detail="The gym map service is busy or temporarily unavailable. Wait a moment and try again.",
-            )
-    except HTTPException:
-        raise
-    except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError) as exc:
-        raise HTTPException(
-            status_code=502,
-            detail="The open map service is temporarily unavailable. Please try again shortly.",
-        ) from exc
+    logger.warning("All Overpass endpoints failed: %s", last_error)
+    raise HTTPException(
+        status_code=503,
+        detail="The gym map service is busy or temporarily unavailable. Wait a moment and try again.",
+    )
 
+
+def _build_gym_list(payload: dict, place: str) -> list:
     gyms = []
     seen = set()
     for element in payload.get("elements", []):
@@ -127,7 +127,7 @@ out center tags;"""
             tags.get("addr:city") or tags.get("addr:town") or tags.get("addr:village"),
         ]
         address = ", ".join(part for part in address_parts if part) or tags.get("addr:full")
-        gym = {
+        gyms.append({
             "id": f"{element.get('type', 'node')}/{element.get('id')}",
             "name": name,
             "address": address or "Address not listed",
@@ -148,16 +148,54 @@ out center tags;"""
                 f"https://www.google.com/maps/dir/?api=1&destination={quote(name + ', ' + place + ', Maharashtra')}"
             ),
             "source": "OpenStreetMap",
-        }
-        gyms.append(gym)
-
+        })
     gyms.sort(key=lambda item: item["name"].casefold())
+    return gyms
+
+
+def _search_place(place: str) -> dict:
+    location = _geocode(place)
+    try:
+        latitude = float(location["lat"])
+        longitude = float(location["lon"])
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(
+            status_code=502,
+            detail="The open map service returned an unexpected location. Please try again.",
+        ) from exc
+    payload = _query_overpass(latitude, longitude)
+    gyms = _build_gym_list(payload, place)
     return {
         "city": place,
         "matched_location": location.get("display_name", place),
-        "count": min(len(gyms), limit),
         "total_mapped_results": len(gyms),
         "source": "OpenStreetMap",
-        "notice": "Community-mapped listings may be incomplete or out of date. Confirm details with the gym before visiting.",
-        "gyms": gyms[:limit],
+        "notice": NOTICE,
+        "gyms": gyms,
+    }
+
+
+@router.get("/search")
+def search_gyms(
+    city: str = Query(..., min_length=2, max_length=100, description="City or district in Maharashtra"),
+    limit: int = Query(50, ge=1, le=100),
+):
+    """Find mapped gyms in a Maharashtra city/district, with map links. Results are cached for one hour."""
+    place = city.strip()
+    if not place:
+        raise HTTPException(status_code=422, detail="Enter a city or district.")
+
+    key = place.casefold()
+    now = time.time()
+    cached = _result_cache.get(key)
+    if cached and now - cached[0] < RESULT_CACHE_TTL:
+        data = cached[1]
+    else:
+        data = _search_place(place)          # raises HTTPException on failure, so nothing is cached
+        _result_cache[key] = (now, data)
+
+    return {
+        **data,
+        "count": min(len(data["gyms"]), limit),
+        "gyms": data["gyms"][:limit],
     }
