@@ -6,6 +6,9 @@ const suggestions = [
   "How do I track a workout?",
   "I'm a beginner. How should I start?",
   "What foods contain protein?",
+  "What are micronutrients?",
+  "What is the difference between macros and micros?",
+  "Which foods contain iron and vitamin B12?",
   "How much rest do I need?",
   "How do I find a gym?",
 ];
@@ -64,7 +67,7 @@ export default function ChatCompanion() {
         <div className="mod-icon-wrap" style={{ background: "rgba(123,95,255,0.15)", borderColor: "rgba(123,95,255,0.35)" }}>💬</div>
         <div className="mod-header-text">
           <h1>Virtual Gym Buddy</h1>
-          <p>Ask about the app, workouts, recovery, or basic nutrition.</p>
+          <p>Ask about the app, workouts, recovery, nutrients, vitamins, and minerals.</p>
         </div>
       </div>
 
@@ -108,7 +111,7 @@ export default function ChatCompanion() {
       </div>
 
       <form onSubmit={handleSubmit} className="chat-input-row">
-        <input className="mod-input" placeholder="Ask about workouts, nutrition, or the app…"
+        <input className="mod-input" placeholder="Ask about workouts, nutrients, vitamins, minerals, or the app…"
           aria-label="Message your Virtual Gym Buddy" value={message}
           onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKey}
           disabled={loading} maxLength={2000} />
