@@ -1,13 +1,9 @@
-"""Location-based gym finder backed by OpenStreetMap / Overpass.
+""""Location-based gym finder backed by OpenStreetMap / Overpass.
 
 Listings are live community-mapped data, not a complete or verified directory.
-
-Changes from the previous version:
-- Successful search results are cached in memory for one hour, so repeat
-  searches for the same city never call Nominatim or Overpass again.
-- Overpass endpoints get a longer per-request timeout (35 s) because the public
-  servers are often slow under load, which caused the 503 errors.
-- Failures are not cached, so the next search retries the network.
+Only the 15 supported Indian cities listed below are accepted, and geocoding
+is constrained to each city's state and India to avoid silently returning
+Pune-area results for a different city name.
 """
 import json
 import logging
@@ -20,23 +16,46 @@ from urllib.request import Request, urlopen
 from fastapi import APIRouter, HTTPException, Query
 
 router = APIRouter(prefix="/gym-finder", tags=["Location-based Gym Finder"])
-USER_AGENT = "AIGymFitnessAssistant/1.0 (Maharashtra gym finder)"
+USER_AGENT = "AIGymFitnessAssistant/1.0 (city gym finder)"
 logger = logging.getLogger(__name__)
+
+# Deliberately limited to 15 supported cities. Keep this list in sync with
+# frontend/src/components/GymRecommender.jsx.
+SUPPORTED_CITIES = {
+    "Pune": "Maharashtra",
+    "Mumbai": "Maharashtra",
+    "Nagpur": "Maharashtra",
+    "Nashik": "Maharashtra",
+    "Bengaluru": "Karnataka",
+    "Hyderabad": "Telangana",
+    "Chennai": "Tamil Nadu",
+    "Delhi": "Delhi",
+    "Kolkata": "West Bengal",
+    "Ahmedabad": "Gujarat",
+    "Surat": "Gujarat",
+    "Jaipur": "Rajasthan",
+    "Lucknow": "Uttar Pradesh",
+    "Indore": "Madhya Pradesh",
+    "Bhopal": "Madhya Pradesh",
+}
 
 OVERPASS_ENDPOINTS = [
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 ]
-OVERPASS_SERVER_TIMEOUT = 25      # [timeout:...] inside the Overpass query
-OVERPASS_CLIENT_TIMEOUT = 35      # how long we wait for each endpoint over the network
+OVERPASS_SERVER_TIMEOUT = 25
+OVERPASS_CLIENT_TIMEOUT = 35
 GEOCODE_TIMEOUT = 15
-RESULT_CACHE_TTL = 60 * 60        # seconds
+RESULT_CACHE_TTL = 60 * 60
 
-NOTICE = "Community-mapped listings may be incomplete or out of date. Confirm details with the gym before visiting."
+NOTICE = (
+    "Community-mapped listings may be incomplete or out of date. "
+    "Confirm details with the gym before visiting."
+)
 NETWORK_ERRORS = (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError)
 
-# place (casefolded) -> (timestamp, full search result before the limit is applied)
+# City (casefolded) -> (timestamp, full search result before the limit is applied)
 _result_cache: dict = {}
 
 
@@ -46,13 +65,12 @@ def _get_json(url: str, timeout: int = 25):
         return json.loads(response.read().decode("utf-8"))
 
 
-def _geocode(place: str) -> dict:
-    # Restrict geocoding to Maharashtra, India so same-named places elsewhere
-    # are less likely to be selected.
+def _geocode(city: str) -> dict:
+    state = SUPPORTED_CITIES[city]
     geocode_url = "https://nominatim.openstreetmap.org/search?" + urlencode({
-        "q": f"{place}, Maharashtra, India",
+        "q": f"{city}, {state}, India",
         "format": "json",
-        "limit": 1,
+        "limit": 5,
         "countrycodes": "in",
         "addressdetails": 1,
     })
@@ -63,12 +81,24 @@ def _geocode(place: str) -> dict:
             status_code=502,
             detail="The open map service is temporarily unavailable. Please try again shortly.",
         ) from exc
-    if not locations:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Couldn't locate '{place}' in Maharashtra. Try a city or district name.",
-        )
-    return locations[0]
+
+    # Prefer a result whose state and country match the configured city.
+    for location in locations:
+        address = location.get("address", {})
+        country = address.get("country_code", "").casefold()
+        state_name = address.get("state", "").casefold()
+        if country == "in" and state.casefold() in state_name:
+            return location
+
+    if locations:
+        # Query already includes city + state + India; use the first matching
+        # result if Nominatim omits state details for a city-centre result.
+        return locations[0]
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Couldn't locate {city}, {state}, India. Please try again later.",
+    )
 
 
 def _query_overpass(latitude: float, longitude: float, radius_m: int = 8000) -> dict:
@@ -80,8 +110,6 @@ def _query_overpass(latitude: float, longitude: float, radius_m: int = 8000) -> 
 out center tags;"""
     encoded_query = urlencode({"data": query}).encode("utf-8")
 
-    # Ask every Overpass server at the same time and use the first good answer.
-    # Sequential attempts made a slow server add its full timeout to the search.
     pool = ThreadPoolExecutor(max_workers=len(OVERPASS_ENDPOINTS))
     try:
         futures = {pool.submit(_query_one_endpoint, url, encoded_query): url for url in OVERPASS_ENDPOINTS}
@@ -93,7 +121,6 @@ out center tags;"""
                 last_error = exc
                 logger.info("Overpass endpoint %s failed: %s", futures[future], exc)
     finally:
-        # wait=False so we don't block on slow servers that are still running
         pool.shutdown(wait=False, cancel_futures=True)
 
     logger.warning("All Overpass endpoints failed: %s", last_error)
@@ -154,12 +181,12 @@ def _build_gym_list(payload: dict, place: str) -> list:
             "map_url": (
                 f"https://www.openstreetmap.org/{element.get('type')}/{element.get('id')}"
                 if element.get("type") and element.get("id") else
-                f"https://www.google.com/maps/search/?api=1&query={quote(name + ', ' + place + ', Maharashtra')}"
+                f"https://www.google.com/maps/search/?api=1&query={quote(name + ', ' + place + ', India')}"
             ),
             "directions_url": (
                 f"https://www.google.com/maps/dir/?api=1&destination={lat},{lon}"
                 if lat is not None and lon is not None else
-                f"https://www.google.com/maps/dir/?api=1&destination={quote(name + ', ' + place + ', Maharashtra')}"
+                f"https://www.google.com/maps/dir/?api=1&destination={quote(name + ', ' + place + ', India')}"
             ),
             "source": "OpenStreetMap",
         })
@@ -167,8 +194,8 @@ def _build_gym_list(payload: dict, place: str) -> list:
     return gyms
 
 
-def _search_place(place: str) -> dict:
-    location = _geocode(place)
+def _search_place(city: str) -> dict:
+    location = _geocode(city)
     try:
         latitude = float(location["lat"])
         longitude = float(location["lon"])
@@ -177,11 +204,12 @@ def _search_place(place: str) -> dict:
             status_code=502,
             detail="The open map service returned an unexpected location. Please try again.",
         ) from exc
+
     payload = _query_overpass(latitude, longitude)
-    gyms = _build_gym_list(payload, place)
+    gyms = _build_gym_list(payload, city)
     return {
-        "city": place,
-        "matched_location": location.get("display_name", place),
+        "city": city,
+        "matched_location": location.get("display_name", f"{city}, {SUPPORTED_CITIES[city]}, India"),
         "total_mapped_results": len(gyms),
         "source": "OpenStreetMap",
         "notice": NOTICE,
@@ -189,23 +217,34 @@ def _search_place(place: str) -> dict:
     }
 
 
+@router.get("/cities")
+def list_supported_cities():
+    """Return the fixed list of supported cities for the gym finder."""
+    return [{"city": city, "state": state} for city, state in SUPPORTED_CITIES.items()]
+
+
 @router.get("/search")
 def search_gyms(
-    city: str = Query(..., min_length=2, max_length=100, description="City or district in Maharashtra"),
+    city: str = Query(..., min_length=2, max_length=100, description="One of the 15 supported Indian cities"),
     limit: int = Query(50, ge=1, le=100),
 ):
-    """Find mapped gyms in a Maharashtra city/district, with map links. Results are cached for one hour."""
-    place = city.strip()
-    if not place:
-        raise HTTPException(status_code=422, detail="Enter a city or district.")
+    """Find mapped gyms in one supported city. Successful results are cached for one hour."""
+    normalized_city = city.strip()
+    city_lookup = {name.casefold(): name for name in SUPPORTED_CITIES}
+    canonical_city = city_lookup.get(normalized_city.casefold())
+    if not canonical_city:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unsupported city. Choose one of: {', '.join(SUPPORTED_CITIES)}.",
+        )
 
-    key = place.casefold()
+    key = canonical_city.casefold()
     now = time.time()
     cached = _result_cache.get(key)
     if cached and now - cached[0] < RESULT_CACHE_TTL:
         data = cached[1]
     else:
-        data = _search_place(place)          # raises HTTPException on failure, so nothing is cached
+        data = _search_place(canonical_city)
         _result_cache[key] = (now, data)
 
     return {
