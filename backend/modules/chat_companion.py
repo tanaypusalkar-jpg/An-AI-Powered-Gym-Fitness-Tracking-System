@@ -1,18 +1,9 @@
 """
-Module 5: Virtual Gym Buddy (AI Chat Companion)
+Module 5: Virtual Gym Buddy (AI Chat Companion).
 
-Two modes:
-1. Rule-based (always available, zero setup) -- keyword sentiment
-   detection + canned motivational replies.
-2. Real LLM (optional) -- if OPENAI_API_KEY is set as an environment
-   variable, every message is answered by an actual language model
-   instead of the canned replies, with the fitness-buddy persona set via
-   a system prompt.
-   Install: pip install openai
-   Configure: set OPENAI_API_KEY before starting the server.
-
-Every exchange (whichever mode produced it) is saved to the database so
-conversation history can be reviewed via /chat/history.
+Supports FAQ-first responses without API keys, with an optional OpenAI
+LLM for questions that aren't covered by the FAQ. Exchanges are persisted
+to the database and can be reviewed via /chat/history.
 """
 import os
 
@@ -22,7 +13,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from db_models import ChatLog
 from models.schemas import ChatRequest
-from logic.chat_logic import detect_sentiment, rule_based_reply
+from logic.chat_logic import detect_sentiment, faq_reply, rule_based_reply
 
 router = APIRouter(prefix="/chat", tags=["Virtual Gym Buddy"])
 
@@ -37,9 +28,14 @@ except ImportError:
     client = None
 
 SYSTEM_PROMPT = (
-    "You are an upbeat, supportive virtual gym buddy inside a fitness app. "
-    "Keep replies short (1-3 sentences), motivating, and practical. "
-    "Never give medical advice; suggest consulting a professional for injuries or health concerns."
+    "You are the helpful Virtual Gym Buddy inside an AI fitness app. "
+    "Answer basic client questions about using the app, beginner workouts, "
+    "exercise habits, recovery, and general nutrition. Keep replies concise, "
+    "friendly, and practical (usually 2-5 sentences). Do not claim that you "
+    "performed an action in the app. Do not diagnose conditions or provide "
+    "medical advice. For injuries, concerning symptoms, or medical questions, "
+    "recommend a qualified healthcare professional. Avoid extreme dieting, "
+    "unsafe exercise instructions, or guarantees about results."
 )
 
 
@@ -50,29 +46,41 @@ def llm_reply(message: str) -> str:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": message},
         ],
-        max_tokens=120,
+        max_tokens=220,
     )
-    return response.choices[0].message.content.strip()
+    reply = response.choices[0].message.content
+    return reply.strip() if reply else (
+        "I couldn't prepare a reply just now. Please try asking in a different way."
+    )
 
 
 @router.post("/message")
 def chat_message(payload: ChatRequest, db: Session = Depends(get_db)):
-    sentiment = detect_sentiment(payload.message)
+    message = payload.message.strip()
+    sentiment = detect_sentiment(message)
 
-    if LLM_AVAILABLE:
+    # Answer known questions deterministically before using an LLM.
+    reply = faq_reply(message)
+    source = "faq" if reply is not None else "rule-based"
+
+    if reply is None and LLM_AVAILABLE:
         try:
-            reply = llm_reply(payload.message)
+            reply = llm_reply(message)
             source = "llm"
-        except Exception as e:
-            # If the API call fails (bad key, network, quota), fall back
-            # gracefully instead of erroring the whole request.
+        except Exception:
+            # Keep the chat usable if the external AI service is unavailable.
             reply = rule_based_reply(sentiment)
-            source = f"rule-based (LLM error: {e})"
-    else:
-        reply = rule_based_reply(sentiment)
-        source = "rule-based"
+            source = "rule-based"
 
-    log = ChatLog(message=payload.message, sentiment=sentiment, reply=reply, source=source)
+    if reply is None:
+        reply = rule_based_reply(sentiment)
+
+    log = ChatLog(
+        message=message,
+        sentiment=sentiment,
+        reply=reply,
+        source=source,
+    )
     db.add(log)
     db.commit()
 
@@ -81,7 +89,9 @@ def chat_message(payload: ChatRequest, db: Session = Depends(get_db)):
 
 @router.get("/history")
 def chat_history(limit: int = 20, db: Session = Depends(get_db)):
-    rows = db.query(ChatLog).order_by(ChatLog.created_at.desc()).limit(limit).all()
+    # Bound the request so clients cannot ask for an unbounded result set.
+    safe_limit = max(1, min(limit, 100))
+    rows = db.query(ChatLog).order_by(ChatLog.created_at.desc()).limit(safe_limit).all()
     return [
         {
             "message": r.message,
@@ -96,4 +106,7 @@ def chat_history(limit: int = 20, db: Session = Depends(get_db)):
 
 @router.get("/status")
 def chat_status():
-    return {"llm_available": LLM_AVAILABLE, "mode": "llm" if LLM_AVAILABLE else "rule-based"}
+    return {
+        "llm_available": LLM_AVAILABLE,
+        "mode": "faq+llm" if LLM_AVAILABLE else "faq+rule-based",
+    }
