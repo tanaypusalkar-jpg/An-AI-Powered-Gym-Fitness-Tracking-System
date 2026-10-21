@@ -63,16 +63,45 @@ def search_gyms(
   nwr["amenity"="gym"]({bbox});
 );
 out center tags;"""
-        overpass_url = "https://overpass-api.de/api/interpreter"
-        request = Request(
-            overpass_url,
-            # Overpass expects form-encoded data=... for POST requests.
-            data=urlencode({"data": query}).encode("utf-8"),
-            headers={"User-Agent": USER_AGENT, "Content-Type": "application/x-www-form-urlencoded"},
-            method="POST",
-        )
-        with urlopen(request, timeout=25) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+        # Public Overpass instances can rate-limit or time out. Try more than
+        # one endpoint before returning an error to the user.
+        encoded_query = urlencode({"data": query}).encode("utf-8")
+        overpass_endpoints = [
+            "https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://overpass.private.coffee/api/interpreter",
+        ]
+        last_error = None
+        payload = None
+        for overpass_url in overpass_endpoints:
+            request = Request(
+                overpass_url,
+                data=encoded_query,
+                headers={
+                    "User-Agent": USER_AGENT,
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+                method="POST",
+            )
+            try:
+                with urlopen(request, timeout=35) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                break
+            except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
+                last_error = exc
+
+        if payload is None:
+            # Keep provider details in the server log while returning a safe,
+            # actionable message to the frontend.
+            import logging
+            logging.getLogger(__name__).warning(
+                "All Overpass endpoints failed for city=%r: %s", place, last_error
+            )
+            raise HTTPException(
+                status_code=503,
+                detail="The gym map service is busy or temporarily unavailable. Wait a moment and try again.",
+            )
     except HTTPException:
         raise
     except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError) as exc:
