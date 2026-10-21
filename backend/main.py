@@ -24,6 +24,7 @@ from modules import (
     gym_recommender,
     analytics,
 )
+from modules import gym_finder
 
 # Define lifespan FIRST
 @asynccontextmanager
@@ -39,8 +40,8 @@ app = FastAPI(
     title="AI Gym & Fitness Assistant API",
     description="Unified backend for workout detection, diet planning, IoT smart gym, "
                 "habit tracking, chat companion, performance scoring, gym recommendations, "
-                "and analytics.",
-    version="2.0.0",
+                "location-based gym finder, and analytics.",
+    version="2.1.0",
     lifespan=lifespan,
 )
 
@@ -65,6 +66,7 @@ app.include_router(habit_tracker.router)
 app.include_router(chat_companion.router)
 app.include_router(performance_analyzer.router)
 app.include_router(gym_recommender.router)
+app.include_router(gym_finder.router)
 app.include_router(analytics.router)
 
 @app.get("/")
