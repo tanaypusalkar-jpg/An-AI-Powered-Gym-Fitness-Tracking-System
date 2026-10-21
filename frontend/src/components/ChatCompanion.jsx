@@ -111,8 +111,8 @@ export default function ChatCompanion() {
       </div>
 
       <form onSubmit={handleSubmit} className="chat-input-row">
-        <input className="mod-input" placeholder="Ask about workouts, nutrients, vitamins, minerals, or the app…"
-          aria-label="Message your Virtual Gym Buddy" value={message}
+        <input id="gym-buddy-message" name="message" type="text" className="mod-input" placeholder="Ask about workouts, nutrients, vitamins, minerals, or the app…"
+          aria-label="Message your Virtual Gym Buddy" autoComplete="off" value={message}
           onChange={(e) => setMessage(e.target.value)} onKeyDown={handleKey}
           disabled={loading} maxLength={2000} />
         <button type="submit" className="chat-send-btn" disabled={loading || !message.trim()}>➤ Send</button>
