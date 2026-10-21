@@ -66,7 +66,8 @@ out center tags;"""
         overpass_url = "https://overpass-api.de/api/interpreter"
         request = Request(
             overpass_url,
-            data=query.encode("utf-8"),
+            # Overpass expects form-encoded data=... for POST requests.
+            data=urlencode({"data": query}).encode("utf-8"),
             headers={"User-Agent": USER_AGENT, "Content-Type": "application/x-www-form-urlencoded"},
             method="POST",
         )
