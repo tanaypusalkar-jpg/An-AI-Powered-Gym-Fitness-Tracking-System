@@ -47,20 +47,15 @@ def search_gyms(
             )
 
         location = locations[0]
-        south, north, west, east = map(float, location["boundingbox"])
-        # Avoid unexpectedly huge Overpass queries for broad geocoding results.
-        if north - south > 1.5 or east - west > 1.5:
-            raise HTTPException(
-                status_code=400,
-                detail="That area is too broad. Search for a city or district headquarters instead.",
-            )
-
-        bbox = f"{south},{west},{north},{east}"
-        query = f"""[out:json][timeout:20];
+        # Use a compact radius around the geocoded city center rather than
+        # the entire city bounding box; large bbox queries often time out.
+        latitude = float(location["lat"])
+        longitude = float(location["lon"])
+        radius_m = 8000
+        query = f"""[out:json][timeout:18];
 (
-  nwr["leisure"="fitness_centre"]({bbox});
-  nwr["sport"~"fitness|gym",i]({bbox});
-  nwr["amenity"="gym"]({bbox});
+  nwr["leisure"="fitness_centre"](around:{radius_m},{latitude},{longitude});
+  nwr["amenity"="gym"](around:{radius_m},{latitude},{longitude});
 );
 out center tags;"""
         # Public Overpass instances can rate-limit or time out. Try more than
@@ -85,7 +80,7 @@ out center tags;"""
                 method="POST",
             )
             try:
-                with urlopen(request, timeout=35) as response:
+                with urlopen(request, timeout=22) as response:
                     payload = json.loads(response.read().decode("utf-8"))
                 break
             except (HTTPError, URLError, TimeoutError, OSError, ValueError) as exc:
