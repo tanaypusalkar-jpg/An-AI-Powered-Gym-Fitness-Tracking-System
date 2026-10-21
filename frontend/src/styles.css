@@ -617,6 +617,9 @@ button { cursor: pointer; background: transparent; }
   background: rgba(123,95,255,0.05);
 }
 .mod-input::placeholder { color: var(--text-dim); }
+/* Native dropdown popups: dark background so option text stays readable */
+select.mod-input { color-scheme: dark; }
+select.mod-input option { background: #0d0d1f; color: var(--text-primary); }
 .mod-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
