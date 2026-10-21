@@ -12,6 +12,7 @@ Changes from the previous version:
 import json
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
@@ -78,30 +79,43 @@ def _query_overpass(latitude: float, longitude: float, radius_m: int = 8000) -> 
 );
 out center tags;"""
     encoded_query = urlencode({"data": query}).encode("utf-8")
-    last_error = None
-    for overpass_url in OVERPASS_ENDPOINTS:
-        request = Request(
-            overpass_url,
-            data=encoded_query,
-            headers={
-                "User-Agent": USER_AGENT,
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
-            },
-            method="POST",
-        )
-        try:
-            with urlopen(request, timeout=OVERPASS_CLIENT_TIMEOUT) as response:
-                return json.loads(response.read().decode("utf-8"))
-        except NETWORK_ERRORS as exc:
-            last_error = exc
-            logger.info("Overpass endpoint %s failed: %s", overpass_url, exc)
+
+    # Ask every Overpass server at the same time and use the first good answer.
+    # Sequential attempts made a slow server add its full timeout to the search.
+    pool = ThreadPoolExecutor(max_workers=len(OVERPASS_ENDPOINTS))
+    try:
+        futures = {pool.submit(_query_one_endpoint, url, encoded_query): url for url in OVERPASS_ENDPOINTS}
+        last_error = None
+        for future in as_completed(futures):
+            try:
+                return future.result()
+            except NETWORK_ERRORS as exc:
+                last_error = exc
+                logger.info("Overpass endpoint %s failed: %s", futures[future], exc)
+    finally:
+        # wait=False so we don't block on slow servers that are still running
+        pool.shutdown(wait=False, cancel_futures=True)
 
     logger.warning("All Overpass endpoints failed: %s", last_error)
     raise HTTPException(
         status_code=503,
         detail="The gym map service is busy or temporarily unavailable. Wait a moment and try again.",
     )
+
+
+def _query_one_endpoint(overpass_url: str, encoded_query: bytes) -> dict:
+    request = Request(
+        overpass_url,
+        data=encoded_query,
+        headers={
+            "User-Agent": USER_AGENT,
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+        },
+        method="POST",
+    )
+    with urlopen(request, timeout=OVERPASS_CLIENT_TIMEOUT) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 def _build_gym_list(payload: dict, place: str) -> list:
