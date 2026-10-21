@@ -18,6 +18,7 @@ export default defineConfig({
       '/habits': backend,
       '/chat': backend,
       '/recommend': backend,
+      '/gym-finder': backend,
     },
   },
 })
