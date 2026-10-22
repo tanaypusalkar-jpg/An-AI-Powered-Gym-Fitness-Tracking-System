@@ -105,7 +105,12 @@ export default function GymRecommender() {
             </p>
           </div>
 
-          {result.gyms.length > 0 ? (
+          {result.service_status === "temporarily_unavailable" ? (
+            <div className="mod-result" role="status">
+              {result.notice}{" "}
+              <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`gyms in ${result.city}, India`)}`} target="_blank" rel="noreferrer">Search {result.city} gyms on Google Maps ↗</a>
+            </div>
+          ) : result.gyms.length > 0 ? (
             <div className="gym-cards">
               {result.gyms.map((gym) => (
                 <article className="gym-card" key={gym.id}>
