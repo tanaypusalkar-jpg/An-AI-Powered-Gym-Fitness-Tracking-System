@@ -7,6 +7,12 @@ export default function ChatCompanion() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const chatRef = useRef(null);
+  const quickPrompts = [
+    "I'm new to fitness. How should I start?",
+    "Give me a simple no-equipment workout",
+    "What foods are good sources of protein?",
+    "How do I use this app?",
+  ];
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
@@ -63,7 +69,14 @@ export default function ChatCompanion() {
         {history.length === 0 && !loading && (
           <div className="chat-empty">
             <div style={{ fontSize: 28, marginBottom: 8 }}>👋</div>
-            Hi! I'm your gym buddy. Type your question below.
+            Hi! I'm your gym buddy. Choose a suggestion or type your question below.
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 14 }} aria-label="Suggested questions">
+              {quickPrompts.map((prompt) => (
+                <button key={prompt} type="button" className="ghost-btn" style={{ fontSize: 11, padding: "8px 10px" }} onClick={() => sendMessage(prompt)} disabled={loading}>
+                  {prompt}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {history.map((m, i) => (
