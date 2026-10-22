@@ -29,7 +29,7 @@ def faq_reply(message: str) -> str | None:
     # Prioritize potentially urgent symptoms before other keyword matches.
     if any(p in text for p in ("chest pain", "chest pressure", "shortness of breath", "short of breath", "fainting", "passed out")):
         return "Stop exercising now. Chest pain, chest pressure, fainting, or severe shortness of breath can be an emergency. Call your local emergency number or seek urgent medical care, and do not resume exercise until medically assessed."
-    if any(p in text for p in ("sharp pain", "injury", "injured", "dizzy", "knee pain", "joint pain", "medical advice")):
+    if any(p in text for p in ("sharp pain", "injury", "injured", "dizzy", "knee pain", "knee hurts", "joint pain", "medical advice")):
         return "Stop or modify the activity that causes pain; don't push through it. I can't diagnose injuries. If pain is severe, sudden, worsening, or affects normal movement, seek prompt medical care; otherwise consult a qualified healthcare professional before returning to painful exercise."
 
     # Greetings and basic conversation
