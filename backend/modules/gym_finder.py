@@ -7,6 +7,7 @@ Pune-area results for a different city name.
 """
 import json
 import logging
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.error import HTTPError, URLError
@@ -44,9 +45,9 @@ OVERPASS_ENDPOINTS = [
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 ]
-OVERPASS_SERVER_TIMEOUT = 25
-OVERPASS_CLIENT_TIMEOUT = 35
-GEOCODE_TIMEOUT = 15
+OVERPASS_SERVER_TIMEOUT = 10
+OVERPASS_CLIENT_TIMEOUT = 12
+GEOCODE_TIMEOUT = 5
 RESULT_CACHE_TTL = 60 * 60
 
 NOTICE = (
@@ -217,6 +218,16 @@ def _search_place(city: str) -> dict:
     }
 
 
+def _refresh_cached_city(city: str, key: str) -> None:
+    """Refresh stale cached results in the background without blocking users."""
+    try:
+        data = _search_place(city)
+        _result_cache[key] = (time.time(), data)
+    except Exception as exc:
+        # Keep serving the last successful snapshot if an upstream provider is down.
+        logger.info("Background gym refresh failed for %s: %s", city, exc)
+
+
 @router.get("/cities")
 def list_supported_cities():
     """Return the fixed list of supported cities for the gym finder."""
@@ -241,11 +252,23 @@ def search_gyms(
     key = canonical_city.casefold()
     now = time.time()
     cached = _result_cache.get(key)
+
     if cached and now - cached[0] < RESULT_CACHE_TTL:
         data = cached[1]
+    elif cached:
+        # Stale-while-revalidate: show the last successful results immediately
+        # instead of making users wait for a slow third-party map service.
+        data = cached[1]
+        threading.Thread(
+            target=_refresh_cached_city,
+            args=(canonical_city, key),
+            daemon=True,
+        ).start()
     else:
+        # First search has a strict upstream timeout; successful results are
+        # cached so subsequent searches are fast.
         data = _search_place(canonical_city)
-        _result_cache[key] = (now, data)
+        _result_cache[key] = (time.time(), data)
 
     return {
         **data,
