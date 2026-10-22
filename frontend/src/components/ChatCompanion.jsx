@@ -1,18 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { postJSON } from "../api.js";
 
-const suggestions = [
-  "What can you help me with?",
-  "How do I track a workout?",
-  "I'm a beginner. How should I start?",
-  "What foods contain protein?",
-  "What are micronutrients?",
-  "What is the difference between macros and micros?",
-  "Which foods contain iron and vitamin B12?",
-  "How much rest do I need?",
-  "How do I find a gym?",
-];
-
 export default function ChatCompanion() {
   const [message, setMessage] = useState("");
   const [history, setHistory] = useState([]);
@@ -71,26 +59,11 @@ export default function ChatCompanion() {
         </div>
       </div>
 
-      {history.length === 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <p style={{ color: "var(--text-muted)", fontSize: 13, marginBottom: 9 }}>Try asking:</p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {suggestions.map((suggestion) => (
-              <button key={suggestion} type="button" className="ghost-btn"
-                style={{ fontSize: 12, padding: "8px 10px" }}
-                disabled={loading} onClick={() => setMessage(suggestion)}>
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       <div className="chat-window" ref={chatRef} aria-live="polite">
         {history.length === 0 && !loading && (
           <div className="chat-empty">
             <div style={{ fontSize: 28, marginBottom: 8 }}>👋</div>
-            Hi! I'm your gym buddy. Choose a suggested question or type your own.
+            Hi! I'm your gym buddy. Type your question below.
           </div>
         )}
         {history.map((m, i) => (
