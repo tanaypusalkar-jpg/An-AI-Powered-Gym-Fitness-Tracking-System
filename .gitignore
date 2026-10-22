@@ -10,3 +10,7 @@ dist/
 
 # OS
 .DS_Store
+
+# Local config and databases (never commit)
+backend/.env
+backend/*.db
