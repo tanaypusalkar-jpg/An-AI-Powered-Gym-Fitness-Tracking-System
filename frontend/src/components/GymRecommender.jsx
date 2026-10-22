@@ -1,28 +1,34 @@
 import { useState } from "react";
 import { getJSON } from "../api.js";
 
-const MAHARASHTRA_LOCATIONS = [
-  "Ahmednagar", "Akola", "Amravati", "Beed", "Bhandara", "Buldhana",
-  "Chandrapur", "Chhatrapati Sambhajinagar", "Dharashiv", "Dhule",
-  "Gadchiroli", "Gondia", "Hingoli", "Jalgaon", "Jalna", "Kolhapur",
-  "Latur", "Mumbai", "Nagpur", "Nanded", "Nandurbar", "Nashik",
-  "Palghar", "Parbhani", "Pune", "Raigad", "Ratnagiri", "Sangli",
-  "Satara", "Sindhudurg", "Solapur", "Thane", "Wardha", "Washim",
-  "Yavatmal"
+const SUPPORTED_CITIES = [
+  "Pune",
+  "Mumbai",
+  "Nagpur",
+  "Nashik",
+  "Bengaluru",
+  "Hyderabad",
+  "Chennai",
+  "Delhi",
+  "Kolkata",
+  "Ahmedabad",
+  "Surat",
+  "Jaipur",
+  "Lucknow",
+  "Indore",
+  "Bhopal",
 ];
 
 export default function GymRecommender() {
   const [city, setCity] = useState("Pune");
-  const [customCity, setCustomCity] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const location = (customCity.trim() || city).trim();
-    if (!location) {
-      setError("Choose or enter a city or district in Maharashtra.");
+    if (!SUPPORTED_CITIES.includes(city)) {
+      setError("Please choose one of the 15 supported cities.");
       return;
     }
 
@@ -31,7 +37,7 @@ export default function GymRecommender() {
     setResult(null);
     try {
       const data = await getJSON(
-        `/gym-finder/search?city=${encodeURIComponent(location)}&limit=50`
+        `/gym-finder/search?city=${encodeURIComponent(city)}&limit=50`
       );
       setResult(data);
     } catch (err) {
@@ -51,39 +57,29 @@ export default function GymRecommender() {
           🗺️
         </div>
         <div className="mod-header-text">
-          <h1>Maharashtra Gym Finder</h1>
-          <p>Discover mapped gyms by city or district across Maharashtra.</p>
+          <h1>City Gym Finder</h1>
+          <p>Find mapped gyms in 15 selected cities across India.</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
         <div className="mod-row">
           <div className="mod-field">
-            <label htmlFor="gym-finder-city">City or district</label>
+            <label htmlFor="gym-finder-city">Select city</label>
             <select
               id="gym-finder-city"
               className="mod-input"
               value={city}
               onChange={(e) => {
                 setCity(e.target.value);
-                setCustomCity("");
+                setResult(null);
+                setError("");
               }}
             >
-              {MAHARASHTRA_LOCATIONS.map((location) => (
+              {SUPPORTED_CITIES.map((location) => (
                 <option key={location} value={location}>{location}</option>
               ))}
             </select>
-          </div>
-          <div className="mod-field">
-            <label htmlFor="gym-finder-custom">Or enter another location</label>
-            <input
-              id="gym-finder-custom"
-              className="mod-input"
-              value={customCity}
-              onChange={(e) => setCustomCity(e.target.value)}
-              placeholder="e.g. Hinjawadi, Pune"
-              maxLength={100}
-            />
           </div>
         </div>
         <button
@@ -92,7 +88,7 @@ export default function GymRecommender() {
           disabled={loading}
           style={{ background: "linear-gradient(135deg, #006080, var(--neon-cyan))" }}
         >
-          {loading ? <><span className="spin" /> Searching mapped gyms...</> : "📍 Find Gyms Near This Location"}
+          {loading ? <><span className="spin" /> Searching gyms in {city}...</> : "📍 Find Gyms"}
         </button>
       </form>
 
@@ -102,7 +98,7 @@ export default function GymRecommender() {
         <section style={{ marginTop: 24 }} aria-live="polite">
           <div style={{ marginBottom: 16 }}>
             <h2 style={{ marginBottom: 6 }}>
-              {result.count} mapped {result.count === 1 ? "gym" : "gyms"} found
+              {result.count} mapped {result.count === 1 ? "gym" : "gyms"} found in {result.city}
             </h2>
             <p style={{ opacity: 0.75, fontSize: 13 }}>
               {result.matched_location}
@@ -131,7 +127,7 @@ export default function GymRecommender() {
             </div>
           ) : (
             <div className="mod-result">
-              No mapped gyms were found for this location. Try a nearby city or a more specific locality.
+              No mapped gyms were found in {result.city}. Try again later; community-mapped data may be incomplete.
             </div>
           )}
 
