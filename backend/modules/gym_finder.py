@@ -45,8 +45,8 @@ OVERPASS_ENDPOINTS = [
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 ]
-OVERPASS_SERVER_TIMEOUT = 10
-OVERPASS_CLIENT_TIMEOUT = 12
+OVERPASS_SERVER_TIMEOUT = 8
+OVERPASS_CLIENT_TIMEOUT = 10
 GEOCODE_TIMEOUT = 5
 RESULT_CACHE_TTL = 60 * 60
 
@@ -102,7 +102,7 @@ def _geocode(city: str) -> dict:
     )
 
 
-def _query_overpass(latitude: float, longitude: float, radius_m: int = 8000) -> dict:
+def _query_overpass(latitude: float, longitude: float, radius_m: int = 5000) -> dict:
     query = f"""[out:json][timeout:{OVERPASS_SERVER_TIMEOUT}];
 (
   nwr["leisure"="fitness_centre"](around:{radius_m},{latitude},{longitude});
@@ -206,9 +206,13 @@ def _search_place(city: str) -> dict:
             detail="The open map service returned an unexpected location. Please try again.",
         ) from exc
 
+    # Keep the first live query reasonably small so public Overpass instances
+    # are less likely to time out under load. Users can still open map links
+    # for wider searches when needed.
     payload = _query_overpass(latitude, longitude)
     gyms = _build_gym_list(payload, city)
     return {
+      "service_status": "ok",
         "city": city,
         "matched_location": location.get("display_name", f"{city}, {SUPPORTED_CITIES[city]}, India"),
         "total_mapped_results": len(gyms),
@@ -266,9 +270,28 @@ def search_gyms(
         ).start()
     else:
         # First search has a strict upstream timeout; successful results are
-        # cached so subsequent searches are fast.
-        data = _search_place(canonical_city)
-        _result_cache[key] = (time.time(), data)
+        # cached so subsequent searches are fast. If Overpass is unavailable,
+        # return a clearly marked temporary-unavailable result instead of a 503
+        # that leaves the frontend with only a generic error banner.
+        try:
+            data = _search_place(canonical_city)
+            _result_cache[key] = (time.time(), data)
+        except HTTPException as exc:
+            if exc.status_code != 503:
+                raise
+            data = {
+                "city": canonical_city,
+                "matched_location": f"{canonical_city}, {SUPPORTED_CITIES[canonical_city]}, India",
+                "total_mapped_results": 0,
+                "source": "OpenStreetMap",
+                "service_status": "temporarily_unavailable",
+                "notice": (
+                    "The live gym map service is temporarily unavailable. "
+                    "No live results are being shown. Please retry shortly or "
+                    "open Google Maps to search for gyms in this city."
+                ),
+                "gyms": [],
+            }
 
     return {
         **data,
