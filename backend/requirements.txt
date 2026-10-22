@@ -6,6 +6,7 @@ uvicorn>=0.32.0
 pydantic>=2.12.0
 python-multipart>=0.0.9
 sqlalchemy>=2.0.30
+python-dotenv>=1.0.0
 
 # ---- Optional upgrades below ----
 # Each module works without these (falls back to rule-based logic).
@@ -16,7 +17,7 @@ sqlalchemy>=2.0.30
 # opencv-python-headless>=4.10.0
 
 # Real LLM-powered chat for the Virtual Gym Buddy (Module 5)
-# openai>=1.40.0
+openai>=1.40.0
 
 # Real MQTT/IoT listener for the Smart Gym Assistant (Module 3)
 # paho-mqtt>=2.1.0

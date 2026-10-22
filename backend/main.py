@@ -7,6 +7,11 @@ Run locally with:
 Then open http://127.0.0.1:8000/docs for the interactive Swagger UI where
 you can test every module's endpoints directly.
 """
+# Load backend/.env BEFORE the modules are imported, because the chat module
+# reads OPENAI_API_KEY when it is imported.
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
