@@ -45,8 +45,8 @@ OVERPASS_ENDPOINTS = [
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 ]
-OVERPASS_SERVER_TIMEOUT = 10
-OVERPASS_CLIENT_TIMEOUT = 12
+OVERPASS_SERVER_TIMEOUT = 8
+OVERPASS_CLIENT_TIMEOUT = 10
 GEOCODE_TIMEOUT = 5
 RESULT_CACHE_TTL = 60 * 60
 
@@ -102,7 +102,7 @@ def _geocode(city: str) -> dict:
     )
 
 
-def _query_overpass(latitude: float, longitude: float, radius_m: int = 8000) -> dict:
+def _query_overpass(latitude: float, longitude: float, radius_m: int = 5000) -> dict:
     query = f"""[out:json][timeout:{OVERPASS_SERVER_TIMEOUT}];
 (
   nwr["leisure"="fitness_centre"](around:{radius_m},{latitude},{longitude});
@@ -206,6 +206,9 @@ def _search_place(city: str) -> dict:
             detail="The open map service returned an unexpected location. Please try again.",
         ) from exc
 
+    # Keep the first live query reasonably small so public Overpass instances
+    # are less likely to time out under load. Users can still open map links
+    # for wider searches when needed.
     payload = _query_overpass(latitude, longitude)
     gyms = _build_gym_list(payload, city)
     return {
