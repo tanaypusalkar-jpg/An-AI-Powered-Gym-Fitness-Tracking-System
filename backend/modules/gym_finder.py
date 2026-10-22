@@ -212,6 +212,7 @@ def _search_place(city: str) -> dict:
     payload = _query_overpass(latitude, longitude)
     gyms = _build_gym_list(payload, city)
     return {
+      "service_status": "ok",
         "city": city,
         "matched_location": location.get("display_name", f"{city}, {SUPPORTED_CITIES[city]}, India"),
         "total_mapped_results": len(gyms),
@@ -269,9 +270,28 @@ def search_gyms(
         ).start()
     else:
         # First search has a strict upstream timeout; successful results are
-        # cached so subsequent searches are fast.
-        data = _search_place(canonical_city)
-        _result_cache[key] = (time.time(), data)
+        # cached so subsequent searches are fast. If Overpass is unavailable,
+        # return a clearly marked temporary-unavailable result instead of a 503
+        # that leaves the frontend with only a generic error banner.
+        try:
+            data = _search_place(canonical_city)
+            _result_cache[key] = (time.time(), data)
+        except HTTPException as exc:
+            if exc.status_code != 503:
+                raise
+            data = {
+                "city": canonical_city,
+                "matched_location": f"{canonical_city}, {SUPPORTED_CITIES[canonical_city]}, India",
+                "total_mapped_results": 0,
+                "source": "OpenStreetMap",
+                "service_status": "temporarily_unavailable",
+                "notice": (
+                    "The live gym map service is temporarily unavailable. "
+                    "No live results are being shown. Please retry shortly or "
+                    "open Google Maps to search for gyms in this city."
+                ),
+                "gyms": [],
+            }
 
     return {
         **data,
