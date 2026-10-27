@@ -34,6 +34,25 @@ def calculate_bmi(weight_kg: float, height_cm: float) -> float:
     return round(weight_kg / (height_m ** 2), 1)
 
 
+def bmi_category(bmi: float) -> str:
+    if bmi < 18.5:
+        return "Underweight"
+    if bmi < 25:
+        return "Normal"
+    if bmi < 30:
+        return "Overweight"
+    return "Obese"
+
+
+def calculate_macros(target_calories: float, weight_kg: float, goal: str) -> dict:
+    """Protein from body weight, fat = 25% of calories, carbs = the rest."""
+    protein_per_kg = {"lose": 2.0, "gain": 1.8}.get(goal, 1.6)
+    protein_g = round(weight_kg * protein_per_kg)
+    fat_g = round(target_calories * 0.25 / 9)
+    carbs_g = max(0, round((target_calories - protein_g * 4 - fat_g * 9) / 4))
+    return {"protein_g": protein_g, "carbs_g": carbs_g, "fat_g": fat_g}
+
+
 def calculate_bmr(weight_kg: float, height_cm: float, age: int, gender: str) -> float:
     if gender.lower() == "male":
         return 10 * weight_kg + 6.25 * height_cm - 5 * age + 5
@@ -63,11 +82,29 @@ def diet_plan(payload: DietPlanRequest, db: Session = Depends(get_db)):
     db.add(log)
     db.commit()
 
+    goal = payload.goal.lower()
+
+    # Safety warning for very low targets
+    min_safe = 1500 if payload.gender.lower() == "male" else 1200
+    warning = None
+    if target_calories < min_safe:
+        warning = (
+            "Target calories are very low. Do not go this low "
+            "without a doctor or dietician."
+        )
+    elif goal == "lose" and bmi < 18.5:
+        warning = "Your BMI is already underweight. Losing weight is not advised."
+
     return {
         "bmi": bmi,
+        "bmi_category": bmi_category(bmi),
+        "bmr": round(bmr),
         "maintenance_calories": round(maintenance_calories),
         "target_calories": round(target_calories),
-        "grocery_list": GROCERY_LISTS.get(payload.goal.lower(), GROCERY_LISTS["maintain"]),
+        "goal": goal,
+        "macros": calculate_macros(target_calories, payload.weight_kg, goal),
+        "warning": warning,
+        "grocery_list": GROCERY_LISTS.get(goal, GROCERY_LISTS["maintain"]),
     }
 
 

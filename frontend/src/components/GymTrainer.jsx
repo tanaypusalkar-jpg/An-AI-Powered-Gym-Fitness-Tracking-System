@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { analyzeWorkout } from "../api";
+import LiveWorkoutCamera from "./LiveWorkoutCamera";
 
 const EXERCISES = [
   { value: "squat",      label: "Squat" },
@@ -124,6 +125,7 @@ export default function GymTrainer() {
         </div>
       )}
       {result?.error && <div className="mod-error">⚠ {result.error}</div>}
+       <LiveWorkoutCamera />
     </div>
   );
 }

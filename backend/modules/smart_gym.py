@@ -96,6 +96,7 @@ def evaluate_reading(
 
     recommendation = "Maintain current resistance."
     rest_seconds = 60
+    status = "ok"
 
     # Heart-rate safety takes priority.
     if heart_rate is not None and heart_rate > 160:
@@ -104,6 +105,7 @@ def evaluate_reading(
             "and take a longer rest."
         )
         rest_seconds = 120
+        status = "alert"
 
     # Too many reps means resistance may be too easy.
     elif reps >= 15:
@@ -112,6 +114,7 @@ def evaluate_reading(
             "consider increasing resistance."
         )
         rest_seconds = 45
+        status = "increase"
 
     # Too few reps means resistance may be too difficult.
     elif reps <= 5:
@@ -120,12 +123,14 @@ def evaluate_reading(
             "consider lowering resistance."
         )
         rest_seconds = 90
+        status = "decrease"
 
     return {
         "equipment_id": equipment_id,
         "current_load_kg": load_kg,
         "reps_completed": reps,
         "heart_rate": heart_rate,
+        "status": status,
         "recommendation": recommendation,
         "suggested_rest_seconds": rest_seconds,
     }
