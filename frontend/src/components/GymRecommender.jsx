@@ -98,7 +98,11 @@ export default function GymRecommender() {
         <section style={{ marginTop: 24 }} aria-live="polite">
           <div style={{ marginBottom: 16 }}>
             <h2 style={{ marginBottom: 6 }}>
-              {result.count} mapped {result.count === 1 ? "gym" : "gyms"} found in {result.city}
+             {result.service_status === "temporarily_unavailable"
+                 ? `Gym search temporarily unavailable in ${result.city}`
+                 : `${result.count} mapped ${
+                 result.count === 1 ? "gym" : "gyms"
+                 } found in ${result.city}`}
             </h2>
             <p style={{ opacity: 0.75, fontSize: 13 }}>
               {result.matched_location}

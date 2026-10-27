@@ -14,3 +14,16 @@ dist/
 # Local config and databases (never commit)
 backend/.env
 backend/*.db
+backend/.env
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python environment
+.venv/

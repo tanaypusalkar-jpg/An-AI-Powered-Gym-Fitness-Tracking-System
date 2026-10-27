@@ -45,9 +45,9 @@ OVERPASS_ENDPOINTS = [
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
 ]
-OVERPASS_SERVER_TIMEOUT = 8
-OVERPASS_CLIENT_TIMEOUT = 10
-GEOCODE_TIMEOUT = 5
+OVERPASS_SERVER_TIMEOUT = 20
+OVERPASS_CLIENT_TIMEOUT = 25
+GEOCODE_TIMEOUT = 10
 RESULT_CACHE_TTL = 60 * 60
 
 NOTICE = (
