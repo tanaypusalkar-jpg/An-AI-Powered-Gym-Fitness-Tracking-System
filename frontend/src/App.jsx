@@ -134,6 +134,7 @@ function Home({ onSelectModule }) {
 export default function App() {
   const [activeModule, setActiveModule] = useState("home");
   const [sidebarOpen,  setSidebarOpen]  = useState(true);
+  const [sidebarPosition, setSidebarPosition] = useState("left");
 
   const moduleMap = {
     "gym-trainer":    <GymTrainer />,
@@ -154,9 +155,10 @@ export default function App() {
   const content = moduleMap[activeModule];
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarPosition === "right" ? "app-shell-right" : ""}`}>
       <Sidebar
         isOpen={sidebarOpen}
+        position={sidebarPosition}
         modules={modules}
         activeModule={activeModule}
         onSelectModule={setActiveModule}
@@ -164,6 +166,9 @@ export default function App() {
       <div className="app-main">
         <Header
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          onTogglePanelPosition={() =>
+            setSidebarPosition((current) => (current === "left" ? "right" : "left"))
+          }
           activeModuleName={activeModuleName}
         />
         <main className="content-area">

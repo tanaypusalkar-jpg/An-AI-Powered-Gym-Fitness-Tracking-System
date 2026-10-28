@@ -56,6 +56,9 @@ button { cursor: pointer; background: transparent; }
   display: flex;
   background: transparent;
 }
+.app-shell-right {
+  flex-direction: row-reverse;
+}
 
 /* ─── Sidebar ────────────────────────────────────────────────── */
 .sidebar {
@@ -74,6 +77,10 @@ button { cursor: pointer; background: transparent; }
   z-index: 100;
 }
 .sidebar-closed { width: var(--sidebar-w-sm); }
+.sidebar-right {
+  border-right: none;
+  border-left: 1px solid var(--border);
+}
 
 .brand {
   height: var(--topbar-h);
@@ -266,6 +273,10 @@ button { cursor: pointer; background: transparent; }
   font-size: 15px;
 }
 .icon-btn:hover { border-color: var(--neon-purple); color: var(--neon-purple); }
+.panel-position-toggle {
+  font-size: 16px;
+  line-height: 1;
+}
 .user-button {
   display: flex;
   align-items: center;

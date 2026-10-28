@@ -1,6 +1,6 @@
-export default function Sidebar({ isOpen, modules, activeModule, onSelectModule }) {
+export default function Sidebar({ isOpen, position = "left", modules, activeModule, onSelectModule }) {
   return (
-    <aside className={`sidebar ${isOpen ? "sidebar-open" : "sidebar-closed"}`}>
+    <aside className={`sidebar ${isOpen ? "sidebar-open" : "sidebar-closed"} ${position === "right" ? "sidebar-right" : "sidebar-left"}`}>
       {/* Brand */}
       <div className="brand">
         <span className="brand-mark">A</span>

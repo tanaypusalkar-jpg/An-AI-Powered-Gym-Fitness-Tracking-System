@@ -1,9 +1,18 @@
-export default function Header({ onToggleSidebar, activeModuleName }) {
+export default function Header({ onToggleSidebar, onTogglePanelPosition, activeModuleName }) {
   return (
     <header className="topbar">
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
         <button type="button" className="icon-btn mobile-menu" onClick={onToggleSidebar} style={{ fontSize: 18 }} aria-label="Toggle navigation">
           ☰
+        </button>
+        <button
+          type="button"
+          className="icon-btn panel-position-toggle"
+          onClick={onTogglePanelPosition}
+          title="Toggle panel position"
+          aria-label="Toggle panel position"
+        >
+          ⇄
         </button>
         <div className="breadcrumb">
           <span>Workspace</span>
